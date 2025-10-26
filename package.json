@@ -8,7 +8,6 @@
     "server": "ts-node --project tsconfig.server.json server.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "build": "vite build",
-    "vercel-build": "cp prisma/schema.prod.prisma prisma/schema.prisma && npx prisma generate && npx prisma migrate deploy && npm run build",
     "build:dev": "vite build --mode development",
     "build:server": "tsc server.prod.ts --outDir dist",
     "build:all": "npm run build && npm run build:server",
