@@ -39,13 +39,56 @@ const DonorRegister = () => {
       return;
     }
 
-    toast.success("Registration successful!", {
-      description: "You're now part of our lifesaving community. We'll notify you when your blood type is needed nearby.",
-    });
+    // Submit to backend API
+    (async () => {
+      try {
+        const emailToSend = formData.email?.trim() ? formData.email : `no-email+${Date.now()}@example.com`;
 
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 2000);
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailToSend,
+            name: formData.fullName,
+            phone: formData.phone,
+            address: formData.location,
+            bloodType: formData.bloodGroup,
+            userType: 'DONOR',
+          }),
+        });
+
+        // Log response for easier debugging
+        let respBody: any = null;
+        try {
+          respBody = await res.json();
+        } catch (e) {
+          // ignore JSON parse errors
+        }
+        console.log('Registration response:', res.status, respBody);
+
+        if (!res.ok) {
+          const err = respBody || {};
+          const msg = err?.error || 'Failed to register';
+          console.error('Registration failed:', msg);
+          toast.error(msg);
+          return;
+        }
+
+        toast.success('Registration successful!', {
+          description:
+            "You're now part of our lifesaving community. We'll notify you when your blood type is needed nearby.",
+        });
+
+        toast.success('Registration successful — ' + (respBody?.email || formData.fullName));
+
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1200);
+      } catch (error: any) {
+        console.error('Registration error:', error);
+        toast.error(error?.message || 'Registration failed');
+      }
+    })();
   };
 
   return (

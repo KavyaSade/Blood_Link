@@ -1,51 +1,117 @@
+import { useEffect, useState } from "react";
 import Navigation from "@/components/Navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Clock, MapPin, Phone, User, CheckCircle, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  Clock,
+  MapPin,
+  Phone,
+  User,
+  CheckCircle,
+  XCircle,
+  Users,
+  Trash2,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  bloodType: string | null;
+  userType: 'DONOR' | 'BLOOD_BANK' | 'ADMIN';
+  createdAt: string;
+}
 
 // Mock data for active requests
-const mockRequests = [
-  {
-    id: 1,
-    patientName: "John Doe",
-    bloodGroup: "O-",
-    unitsRequired: 2,
-    urgency: "critical",
-    location: "City General Hospital, 123 Main St",
-    contactPhone: "+1 (555) 123-4567",
-    timePosted: "5 minutes ago",
-    status: "open",
-    distance: "1.2 km away",
-  },
-  {
-    id: 2,
-    patientName: "Jane Smith",
-    bloodGroup: "A+",
-    unitsRequired: 3,
-    urgency: "high",
-    location: "St. Mary's Medical Center, 456 Oak Ave",
-    contactPhone: "+1 (555) 234-5678",
-    timePosted: "15 minutes ago",
-    status: "open",
-    distance: "3.5 km away",
-  },
-  {
-    id: 3,
-    patientName: "Mike Johnson",
-    bloodGroup: "B+",
-    unitsRequired: 1,
-    urgency: "medium",
-    location: "Riverside Clinic, 789 River Rd",
-    contactPhone: "+1 (555) 345-6789",
-    timePosted: "1 hour ago",
-    status: "assigned",
-    distance: "5.8 km away",
-  },
-];
+const mockRequests = [];
 
 const Dashboard = () => {
+  console.log('Dashboard component rendered');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      // Use relative path so Vite dev proxy (or production same-origin) handles routing
+      const response = await fetch('/api/users');
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+      console.log('Fetched users:', data);
+      setUsers(data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users. Please make sure the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchUsers, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const createTestUser = async () => {
+    try {
+      const payload = {
+        email: `test+${Date.now()}@example.com`,
+        name: 'Test Donor',
+        phone: '+10000000000',
+        address: 'Test City',
+        bloodType: 'O+',
+        userType: 'DONOR',
+      } as const;
+
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Failed to create test user');
+      }
+
+      const created = await res.json();
+      console.log('Created test user:', created);
+      toast.success('Test user created');
+      // Refresh list
+      fetchUsers();
+    } catch (err: any) {
+      console.error('Error creating test user:', err);
+      toast.error(err?.message || 'Failed to create test user');
+    }
+  };
   const handleRespond = (requestId: number, patientName: string) => {
     toast.success("Response sent!", {
       description: `Your contact information has been shared with ${patientName}'s family.`,
@@ -85,8 +151,132 @@ const Dashboard = () => {
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Active Blood Requests</h1>
+          <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
+            Manage users and blood requests in one place
+          </p>
+        </div>
+
+        {/* User Management Section */}
+        <div className="mb-8">
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold">Registered Users</h2>
+              <div className="flex items-center gap-4">
+                <div className="flex gap-2">
+                  <Badge variant="outline">
+                    Total Users: {users.length}
+                  </Badge>
+                  <Badge variant="outline">
+                    Donors: {users.filter(u => u.userType === 'DONOR').length}
+                  </Badge>
+                  <Badge variant="outline">
+                    Blood Banks: {users.filter(u => u.userType === 'BLOOD_BANK').length}
+                  </Badge>
+                </div>
+
+                <Button variant="ghost" size="sm" onClick={createTestUser}>
+                  Add test user
+                </Button>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-8">Loading users...</div>
+            ) : users.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No users registered yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  {/* Table Header, Body */}
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Blood Type</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge>
+                            {user.userType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{user.bloodType || 'N/A'}</TableCell>
+                        <TableCell>{user.phone || 'N/A'}</TableCell>
+                        <TableCell>
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 px-3"
+                                title="Delete user"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {user.name}? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/users/${user.id}`, {
+                                        method: 'DELETE',
+                                      });
+                                      
+                                      if (!res.ok) {
+                                        const err = await res.json().catch(() => ({}));
+                                        throw new Error(err?.error || 'Failed to delete user');
+                                      }
+
+                                      toast.success(`Deleted ${user.name}`);
+                                      fetchUsers(); // Refresh list
+                                    } catch (err: any) {
+                                      console.error('Error deleting user:', err);
+                                      toast.error(err?.message || 'Failed to delete user');
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Blood Requests Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Active Blood Requests</h2>
+          <p className="text-muted-foreground mb-6">
             Real-time emergency blood requests in your area. Respond quickly to save lives.
           </p>
         </div>
